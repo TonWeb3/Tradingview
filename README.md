@@ -46,6 +46,16 @@ a position is entered (once per window). At window close, `close vs open`
 decides the outcome: win if your predicted direction matches the candle color.
 No trade if the signal never aligned that window.
 
+**Fresh signals only.** A position is entered only with a signal that was
+re-evaluated *after* the current window opened. Since every evaluation waits
+`signal_delay` after a candle closes, a new window never enters on a stale,
+carried-over signal — it holds until a fresh reading arrives.
+
+**Neutral close.** If an open position's signal breaks back to neutral (the
+selected timeframes/indicators stop agreeing), the position is closed
+immediately mid-window and logged as a **neutral close** — a distinct outcome
+that is *not* counted as a win or loss.
+
 **Data sources.**
 - Binance **websocket** (`stream.binance.com`) — live price + candle open/close
   + new-candle events, for the window and every signal timeframe.

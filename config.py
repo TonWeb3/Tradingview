@@ -26,6 +26,8 @@ class Config:
     use_recommendation: bool = True
     use_ma: bool = False
     use_oscillator: bool = False
+    # Close an open position mid-window if the signal breaks back to neutral.
+    close_on_neutral: bool = True
     # Seconds to wait after a candle closes before calling tradingview_ta, so the
     # scanner has time to publish the just-closed candle (its feed lags ~15-40s).
     signal_delay_sec: int = 20
@@ -68,6 +70,7 @@ class Config:
             use_recommendation=self.use_recommendation,
             use_ma=self.use_ma,
             use_oscillator=self.use_oscillator,
+            close_on_neutral=self.close_on_neutral,
             signal_delay_sec=max(0, min(120, int(self.signal_delay_sec))),
         )
 

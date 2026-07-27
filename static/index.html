@@ -89,6 +89,7 @@
   .res.UP{background:var(--up);} .res.DOWN{background:var(--down);} .res.FLAT{background:var(--neutral);}
   .oc{font-weight:800;font-size:11px;}
   .oc.win{color:var(--up);} .oc.loss{color:var(--down);} .oc.none,.oc.pre,.oc.flat{color:var(--muted);}
+  .oc.neutral{color:var(--accent);}
   .mb{margin-bottom:16px;}
 </style>
 </head>
@@ -159,6 +160,7 @@
           <div class="stat"><div class="n num" id="stTrades">0</div><div class="l">Trades</div></div>
           <div class="stat"><div class="n num up-c" id="stWins">0</div><div class="l">Wins</div></div>
           <div class="stat"><div class="n num down-c" id="stLoss">0</div><div class="l">Losses</div></div>
+          <div class="stat"><div class="n num" id="stNeutral" style="color:var(--accent)">0</div><div class="l">Neut. close</div></div>
           <div class="stat"><div class="n num" id="stWr">—</div><div class="l">Win rate</div></div>
         </div>
       </div>
@@ -225,13 +227,21 @@ function render(st){
     $("barfill").style.width=Math.max(0,Math.min(100,(now-w.openTime)/tot*100))+"%";
     // position
     const p=w.prediction;
-    $("posPill").className="pill "+(p||"WAIT"); $("posPill").textContent=p||"WAIT";
-    if(p){
+    if(w.earlyClosed){
+      $("posPill").className="pill WAIT"; $("posPill").textContent="CLOSED";
+      $("posTitle").textContent=`${p} position closed — signal turned neutral`;
+      $("posMeta").textContent=`exited early @ ${fmt(w.price)} · no win/loss counted`;
+    }else if(p){
+      $("posPill").className="pill "+p; $("posPill").textContent=p;
       $("posTitle").textContent=`${p} position — predicting candle closes ${p==="UP"?"above":"below"} open`;
       $("posMeta").textContent=`entered @ ${fmt(w.entryPrice)}${w.entryTime?" · "+timeStr(w.entryTime):""}`;
     }else{
+      $("posPill").className="pill WAIT"; $("posPill").textContent="WAIT";
       $("posTitle").textContent="No position this window";
-      $("posMeta").textContent="Waiting for all selected signals to agree (neutral = wait)";
+      if(!w.signalFresh)
+        $("posMeta").textContent=`Holding for a fresh signal — waiting out the ${c.signal_delay_sec}s delay after the new candle so it can't enter on an old signal`;
+      else
+        $("posMeta").textContent="Waiting for all selected signals to agree (neutral = wait)";
     }
   }
 
@@ -253,6 +263,7 @@ function render(st){
   // stats
   const s=st.stats;
   $("stTrades").textContent=s.trades; $("stWins").textContent=s.wins; $("stLoss").textContent=s.losses;
+  $("stNeutral").textContent=s.neutral||0;
   $("stWr").textContent=s.winrate==null?"—":fmt(s.winrate,1)+"%";
 
   // history
@@ -264,7 +275,7 @@ function render(st){
       <td class="r num">${fmt(h.close)}</td>
       <td><span class="res ${h.result}">${h.result}</span></td>
       <td>${h.prediction?`<span class="tag ${h.prediction}">${h.prediction}</span>`:'<span class="neu-c">—</span>'}</td>
-      <td><span class="oc ${h.outcome}">${h.outcome==="none"?"no bet":h.outcome==="pre"?"pre-start":h.outcome.toUpperCase()}</span></td>`;
+      <td><span class="oc ${h.outcome}">${h.outcome==="none"?"no bet":h.outcome==="pre"?"pre-start":h.outcome==="neutral"?"NEUTRAL CLOSE":h.outcome.toUpperCase()}</span></td>`;
     hb.appendChild(tr);
   });
 }

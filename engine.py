@@ -36,9 +36,10 @@ class Engine:
         self.live_price: float | None = None
         self.analyses: dict[str, dict] = {}          # tf -> groups dict
         self.signal = {"signal": sig.WAIT, "cells": [], "ready": False}
+        self.signal_time: int = 0                    # when the signal was last refreshed (ms)
         self.win: dict | None = None                 # current window
         self.history: deque = deque(maxlen=200)
-        self.stats = {"trades": 0, "wins": 0, "losses": 0, "flat": 0}
+        self.stats = {"trades": 0, "wins": 0, "losses": 0, "flat": 0, "neutral": 0}
         self.error: str | None = None
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
@@ -78,11 +79,12 @@ class Engine:
         # (from the websocket) appear instantly instead of waiting on TA.
         asyncio.create_task(self._seed_safe())
 
+        streams = self._streams()
         while not self._stop.is_set():
             try:
-                url = WS_BASE + self._streams()
-                log.info("connecting Binance ws: %s", self._streams())
-                async with websockets.connect(url, ping_interval=20, close_timeout=5) as ws:
+                log.info("connecting Binance ws: %s", streams)
+                async with websockets.connect(WS_BASE + streams, ping_interval=20,
+                                               close_timeout=5, open_timeout=10) as ws:
                     self.error = None
                     async for raw in ws:
                         if self._stop.is_set():
@@ -178,7 +180,7 @@ class Engine:
             a = await asyncio.to_thread(sig.fetch_analysis, self.cfg.tv_symbol(), tf)
             self.analyses[tf] = sig.read_groups(a)
             self._recompute()
-            self._try_enter()
+            self._on_signal()
             log.info("TA refreshed [%s]: %s", tf, self.analyses[tf])
         finally:
             self._pending_tf.discard(tf)
@@ -186,18 +188,61 @@ class Engine:
     def _recompute(self):
         self.signal = sig.combine(
             self.analyses, self.cfg.signal_timeframes, self.cfg.indicators())
+        # Stamp when the signal was (re)computed from a fresh TA fetch. Every
+        # caller of _recompute runs right after fetching, and each fetch waits
+        # signal_delay first — so this timestamp marks a delay-gated fresh read.
+        self.signal_time = now_ms()
+
+    def _on_signal(self):
+        """React to a freshly computed signal: close an open position if the
+        agreement has broken to neutral, otherwise consider entering."""
+        w, s = self.win, self.signal
+        if not w or w.get("settled"):
+            return
+        # In a position and the signal is no longer unanimous (data present but
+        # neutral/mixed) -> close it now instead of riding a dead thesis.
+        # Only when the close-on-neutral toggle is enabled.
+        if (self.cfg.close_on_neutral and w.get("prediction")
+                and s["signal"] == sig.WAIT and s.get("ready")):
+            self._close_neutral(w)
+            return
+        self._try_enter()
 
     def _try_enter(self):
-        """Enter the current window once, when the combined signal is directional."""
+        """Enter the current window once, and only with a *fresh* signal.
+
+        The signal must have been refreshed after this window opened; otherwise
+        we'd be entering on a stale reading carried over from a previous candle.
+        Because every refresh waits signal_delay, this also means the window has
+        waited out the delay before any entry.
+        """
         w, s = self.win, self.signal
         if not w or w.get("settled") or w.get("prediction"):
             return
+        if self.signal_time < w["openTime"]:
+            return                                  # signal predates this window — too old
         if s["signal"] in (sig.UP, sig.DOWN):
             w["prediction"] = s["signal"]
             w["entryPrice"] = self.live_price
             w["entryTime"] = now_ms()
             w["entryCells"] = s["cells"]
-            log.info("ENTER %s @ %s (window open %s)", s["signal"], self.live_price, w["open"])
+            log.info("ENTER %s @ %s (window open %s, signal age %.0fs)",
+                     s["signal"], self.live_price, w["open"], (now_ms() - self.signal_time) / 1000)
+
+    def _close_neutral(self, w: dict):
+        """Close an open position mid-window because the signal went neutral.
+        Recorded as a distinct 'neutral close' — not a win or a loss."""
+        price = self.live_price or w["close"]
+        o = w["open"]
+        result = "UP" if price > o else "DOWN" if price < o else "FLAT"
+        self.stats["neutral"] += 1
+        self.history.append({
+            "openTime": w["openTime"], "open": o, "close": price, "result": result,
+            "prediction": w["prediction"], "outcome": "neutral",
+        })
+        w["settled"] = True          # done trading this window; no re-entry, no double settle
+        w["earlyClosed"] = True
+        log.info("NEUTRAL CLOSE: pred=%s exit=%s (window open %s)", w["prediction"], price, o)
 
     # ---- snapshot for the UI ------------------------------------------
     def snapshot(self) -> dict:
@@ -214,6 +259,9 @@ class Engine:
                 "liveResult": "UP" if price > o else "DOWN" if price < o else "FLAT",
                 "prediction": w.get("prediction"),
                 "entryPrice": w.get("entryPrice"), "entryTime": w.get("entryTime"),
+                "earlyClosed": bool(w.get("earlyClosed")),
+                # True once a fresh (post-open, delay-gated) signal exists for this window.
+                "signalFresh": self.signal_time >= w["openTime"],
             }
         trades = self.stats["trades"]
         winrate = (self.stats["wins"] / trades * 100) if trades else None

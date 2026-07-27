@@ -60,6 +60,7 @@ class ConfigIn(BaseModel):
     use_recommendation: bool = True
     use_ma: bool = False
     use_oscillator: bool = False
+    close_on_neutral: bool = True
     signal_delay_sec: int = 20
 
 
@@ -81,6 +82,7 @@ def get_config():
         "signal_timeframes": c.signal_timeframes,
         "use_recommendation": c.use_recommendation,
         "use_ma": c.use_ma, "use_oscillator": c.use_oscillator,
+        "close_on_neutral": c.close_on_neutral,
         "signal_delay_sec": c.signal_delay_sec,
         "options": {
             "windows": config_mod.WINDOWS,

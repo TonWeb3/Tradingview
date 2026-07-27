@@ -7,5 +7,6 @@
   "use_recommendation": true,
   "use_ma": false,
   "use_oscillator": false,
-  "signal_delay_sec": 2
+  "close_on_neutral": true,
+  "signal_delay_sec": 5
 }
