@@ -1,0 +1,11 @@
+{
+  "symbol": "BTCUSDT",
+  "window": "5m",
+  "signal_timeframes": [
+    "1m"
+  ],
+  "use_recommendation": true,
+  "use_ma": false,
+  "use_oscillator": false,
+  "signal_delay_sec": 2
+}

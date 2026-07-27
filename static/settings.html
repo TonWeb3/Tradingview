@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BINARY OP · Settings</title>
+<style>
+  :root{
+    --bg:#0d1015; --surface:#161b22; --surface-2:#1c222c; --surface-3:#232b37;
+    --border:#2a323f; --border-strong:#37414f; --ink:#e7edf5; --ink-2:#b6c0cf; --muted:#8792a3;
+    --accent:#4f86ff; --up:#14c08c; --down:#ef4444; --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+  }
+  :root[data-theme="light"]{
+    --bg:#f4f6fb; --surface:#fff; --surface-2:#f0f3f8; --surface-3:#e9edf4;
+    --border:#e2e7f0; --border-strong:#d0d7e2; --ink:#101521; --ink-2:#47526a; --muted:#7b8698;
+    --accent:#3b73f0; --up:#0ca678; --down:#e5383b; --shadow:0 1px 2px rgba(16,25,45,.04),0 8px 24px rgba(16,25,45,.06);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14.5px/1.5 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:680px;margin:0 auto;padding:24px 18px 60px;}
+  a{color:var(--accent);text-decoration:none;}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:20px;}
+  .logo{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;flex:none;
+    background:linear-gradient(150deg,var(--up),var(--down));color:#fff;font-weight:800;}
+  header h1{font-size:18px;margin:0;font-weight:800;letter-spacing:.3px;}
+  header .spacer{flex:1;}
+  .link-btn{height:36px;border:1px solid var(--border);background:var(--surface);color:var(--ink-2);
+    border-radius:9px;cursor:pointer;display:inline-flex;align-items:center;padding:0 13px;font-weight:600;}
+  .link-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);
+    padding:20px;display:grid;gap:22px;}
+  .field{display:grid;gap:9px;}
+  .field>label{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);font-weight:700;}
+  .field .hint{font-size:12px;color:var(--muted);}
+  input[type=text],input[type=number]{background:var(--surface);color:var(--ink);border:1px solid var(--border-strong);
+    border-radius:10px;padding:11px 13px;font:inherit;font-size:14px;outline:none;max-width:260px;}
+  input:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent);}
+
+  .opts{display:flex;gap:9px;flex-wrap:wrap;}
+  .opt{position:relative;}
+  .opt input{position:absolute;opacity:0;inset:0;cursor:pointer;}
+  .opt span{display:inline-flex;align-items:center;justify-content:center;padding:9px 15px;border-radius:9px;
+    border:1px solid var(--border-strong);background:var(--surface-2);font-weight:700;font-size:13px;cursor:pointer;
+    font-variant-numeric:tabular-nums;transition:.12s;user-select:none;}
+  .opt input:checked+span{border-color:var(--accent);color:#fff;background:var(--accent);}
+  .opt input:focus-visible+span{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 25%,transparent);}
+
+  .save{margin-top:4px;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px 26px;
+    font-weight:800;font-size:14.5px;cursor:pointer;letter-spacing:.3px;}
+  .save:hover{filter:brightness(1.06);}
+  .save:disabled{opacity:.6;}
+  .msg{font-size:13px;margin-left:14px;}
+  .msg.ok{color:var(--up);} .msg.err{color:var(--down);}
+  .row{display:flex;align-items:center;}
+  .note{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;
+    font-size:12.5px;color:var(--ink-2);line-height:1.6;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">B</div>
+    <h1>Settings</h1>
+    <div class="spacer"></div>
+    <a class="link-btn" href="/">← Dashboard</a>
+  </header>
+
+  <form class="card" id="form">
+    <div class="field">
+      <label>Market window</label>
+      <div class="hint">The up/down period — a new open price is marked at the start of each.</div>
+      <div class="opts" id="windowOpts"></div>
+    </div>
+
+    <div class="field">
+      <label>Symbol (Binance)</label>
+      <input type="text" id="symbol" placeholder="BTCUSDT" autocomplete="off">
+    </div>
+
+    <div class="field">
+      <label>Signal timeframes</label>
+      <div class="hint">tradingview_ta is called on every new candle of each. Pick one or several.</div>
+      <div class="opts" id="tfOpts"></div>
+    </div>
+
+    <div class="field">
+      <label>Indicators to require</label>
+      <div class="hint">When several are ticked (or several timeframes chosen), ALL must agree —
+        all buy → UP, all sell → DOWN, anything neutral/mixed → wait.</div>
+      <div class="opts">
+        <label class="opt"><input type="checkbox" id="use_recommendation"><span>Recommendation</span></label>
+        <label class="opt"><input type="checkbox" id="use_ma"><span>Moving Averages</span></label>
+        <label class="opt"><input type="checkbox" id="use_oscillator"><span>Oscillators</span></label>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Signal delay (seconds)</label>
+      <div class="hint">Wait this long after a candle closes before calling TA, so its feed has
+        published the new candle (it lags ~15–40s).</div>
+      <input type="number" id="signal_delay_sec" min="0" max="120" value="20">
+    </div>
+
+    <div class="row">
+      <button class="save" id="save" type="submit">Save & apply</button>
+      <span class="msg" id="msg"></span>
+    </div>
+
+    <div class="note">
+      Saving restarts the engine with the new settings: fresh window, fresh history, and a new
+      Binance subscription. Uses live Binance prices with TradingView TA signals — it's a
+      simulator (paper trades), not a real order venue.
+    </div>
+  </form>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+document.documentElement.setAttribute("data-theme",
+  (localStorage.getItem("theme")||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light")));
+
+let OPTS={windows:["5m","15m"],signal_timeframes:["1m","5m","15m","30m","1h"]};
+
+function buildOpts(cur){
+  $("windowOpts").innerHTML=OPTS.windows.map(w=>
+    `<label class="opt"><input type="radio" name="win" value="${w}" ${w===cur.window?"checked":""}><span>${w}</span></label>`).join("");
+  $("tfOpts").innerHTML=OPTS.signal_timeframes.map(tf=>
+    `<label class="opt"><input type="checkbox" name="tf" value="${tf}" ${cur.signal_timeframes.includes(tf)?"checked":""}><span>${tf}</span></label>`).join("");
+  $("symbol").value=cur.symbol;
+  $("use_recommendation").checked=cur.use_recommendation;
+  $("use_ma").checked=cur.use_ma;
+  $("use_oscillator").checked=cur.use_oscillator;
+  $("signal_delay_sec").value=cur.signal_delay_sec;
+}
+
+async function load(){
+  const c=await (await fetch("/api/config")).json();
+  if(c.options)OPTS=c.options;
+  buildOpts(c);
+}
+load();
+
+$("form").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const body={
+    symbol:$("symbol").value.trim()||"BTCUSDT",
+    window:document.querySelector('input[name=win]:checked')?.value||"15m",
+    signal_timeframes:[...document.querySelectorAll('input[name=tf]:checked')].map(x=>x.value),
+    use_recommendation:$("use_recommendation").checked,
+    use_ma:$("use_ma").checked,
+    use_oscillator:$("use_oscillator").checked,
+    signal_delay_sec:parseInt($("signal_delay_sec").value||"20",10),
+  };
+  const msg=$("msg"); $("save").disabled=true; msg.textContent="Saving…"; msg.className="msg";
+  try{
+    const r=await fetch("/api/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const d=await r.json();
+    if(r.ok){ msg.textContent="Saved — engine restarted."; msg.className="msg ok";
+      setTimeout(()=>location.href="/",800); }
+    else { msg.textContent=(d.errors||["error"]).join("; "); msg.className="msg err"; }
+  }catch(err){ msg.textContent="Request failed: "+err.message; msg.className="msg err"; }
+  finally{ $("save").disabled=false; }
+});
+</script>
+</body>
+</html>
