@@ -8,5 +8,6 @@
   "use_ma": false,
   "use_oscillator": false,
   "close_on_neutral": true,
+  "close_on_reversal": false,
   "signal_delay_sec": 5
 }

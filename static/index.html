@@ -90,6 +90,10 @@
   .oc{font-weight:800;font-size:11px;}
   .oc.win{color:var(--up);} .oc.loss{color:var(--down);} .oc.none,.oc.pre,.oc.flat{color:var(--muted);}
   .oc.neutral{color:var(--accent);}
+  .oc.reversal{color:#a855f7;}
+  .dl-btn{height:28px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink-2);
+    border-radius:8px;cursor:pointer;padding:0 11px;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:5px;}
+  .dl-btn:hover{border-color:var(--accent);color:var(--accent);}
   .mb{margin-bottom:16px;}
 </style>
 </head>
@@ -161,6 +165,7 @@
           <div class="stat"><div class="n num up-c" id="stWins">0</div><div class="l">Wins</div></div>
           <div class="stat"><div class="n num down-c" id="stLoss">0</div><div class="l">Losses</div></div>
           <div class="stat"><div class="n num" id="stNeutral" style="color:var(--accent)">0</div><div class="l">Neut. close</div></div>
+          <div class="stat"><div class="n num" id="stReversal" style="color:#a855f7">0</div><div class="l">Rev. close</div></div>
           <div class="stat"><div class="n num" id="stWr">—</div><div class="l">Win rate</div></div>
         </div>
       </div>
@@ -170,7 +175,9 @@
   <!-- HISTORY -->
   <div class="card" style="margin-top:16px">
     <div class="hd"><span class="t">Window History</span>
-      <span class="sub" style="color:var(--muted);font-size:11px">newest first · windows that closed since the engine started</span></div>
+      <span class="sub" style="color:var(--muted);font-size:11px">newest first · windows that closed since the engine started</span>
+      <div style="flex:1"></div>
+      <button class="dl-btn" id="dlCsv" title="Download past trades as CSV (resets when settings change)">⬇ CSV</button></div>
     <div class="bd" style="padding:0">
       <table>
         <thead><tr><th>Time</th><th class="r">Open</th><th class="r">Close</th><th>Result</th><th>Prediction</th><th>Outcome</th></tr></thead>
@@ -187,6 +194,7 @@ let clockOffset=0, endTime=null;
 /* theme */
 function dark(){const t=document.documentElement.getAttribute("data-theme");return t?t==="dark":true;}
 $("themeBtn").onclick=()=>{document.documentElement.setAttribute("data-theme",dark()?"light":"dark");$("themeBtn").textContent=dark()?"🌙":"☀";};
+$("dlCsv").onclick=()=>{window.location.href="/api/history.csv";};
 
 function fmt(n,dp=2){if(n==null)return"—";return Number(n).toLocaleString(undefined,{minimumFractionDigits:dp,maximumFractionDigits:dp});}
 function clsDir(d){return d==="UP"?"up-c":d==="DOWN"?"down-c":"neu-c";}
@@ -228,8 +236,9 @@ function render(st){
     // position
     const p=w.prediction;
     if(w.earlyClosed){
+      const reason=w.closeReason==="reversal"?"signal reversed to the opposite direction":"signal turned neutral";
       $("posPill").className="pill WAIT"; $("posPill").textContent="CLOSED";
-      $("posTitle").textContent=`${p} position closed — signal turned neutral`;
+      $("posTitle").textContent=`${p} position closed — ${reason}`;
       $("posMeta").textContent=`exited early @ ${fmt(w.price)} · no win/loss counted`;
     }else if(p){
       $("posPill").className="pill "+p; $("posPill").textContent=p;
@@ -264,6 +273,7 @@ function render(st){
   const s=st.stats;
   $("stTrades").textContent=s.trades; $("stWins").textContent=s.wins; $("stLoss").textContent=s.losses;
   $("stNeutral").textContent=s.neutral||0;
+  $("stReversal").textContent=s.reversal||0;
   $("stWr").textContent=s.winrate==null?"—":fmt(s.winrate,1)+"%";
 
   // history
@@ -275,7 +285,7 @@ function render(st){
       <td class="r num">${fmt(h.close)}</td>
       <td><span class="res ${h.result}">${h.result}</span></td>
       <td>${h.prediction?`<span class="tag ${h.prediction}">${h.prediction}</span>`:'<span class="neu-c">—</span>'}</td>
-      <td><span class="oc ${h.outcome}">${h.outcome==="none"?"no bet":h.outcome==="pre"?"pre-start":h.outcome==="neutral"?"NEUTRAL CLOSE":h.outcome.toUpperCase()}</span></td>`;
+      <td><span class="oc ${h.outcome}">${h.outcome==="none"?"no bet":h.outcome==="pre"?"pre-start":h.outcome==="neutral"?"NEUTRAL CLOSE":h.outcome==="reversal"?"REVERSAL":h.outcome.toUpperCase()}</span></td>`;
     hb.appendChild(tr);
   });
 }

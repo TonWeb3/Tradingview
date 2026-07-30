@@ -19,8 +19,12 @@ from pathlib import Path
 # Make sibling modules importable whether launched via `python app.py` or uvicorn.
 sys.path.insert(0, str(Path(__file__).parent))
 
+import csv
+import io
+from datetime import datetime, timezone
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel
 
 import config as config_mod
@@ -61,6 +65,7 @@ class ConfigIn(BaseModel):
     use_ma: bool = False
     use_oscillator: bool = False
     close_on_neutral: bool = True
+    close_on_reversal: bool = False
     signal_delay_sec: int = 20
 
 
@@ -83,6 +88,7 @@ def get_config():
         "use_recommendation": c.use_recommendation,
         "use_ma": c.use_ma, "use_oscillator": c.use_oscillator,
         "close_on_neutral": c.close_on_neutral,
+        "close_on_reversal": c.close_on_reversal,
         "signal_delay_sec": c.signal_delay_sec,
         "options": {
             "windows": config_mod.WINDOWS,
@@ -105,6 +111,24 @@ async def set_config(body: ConfigIn):
 @app.get("/api/state")
 def get_state():
     return app.state.engine.snapshot()
+
+
+@app.get("/api/history.csv")
+def history_csv():
+    """Download the current session's window history as CSV. History resets
+    whenever settings change, so this always reflects the running config."""
+    eng = app.state.engine
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["time_utc", "open_time_ms", "open", "close", "result", "prediction", "outcome"])
+    for h in eng.history:
+        ts = datetime.fromtimestamp(h["openTime"] / 1000, timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        w.writerow([ts, h["openTime"], h["open"], h["close"], h["result"],
+                    h.get("prediction") or "", h["outcome"]])
+    return Response(
+        content=buf.getvalue(), media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=binary_op_history.csv"},
+    )
 
 
 @app.websocket("/ws")

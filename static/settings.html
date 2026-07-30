@@ -107,6 +107,16 @@
     </div>
 
     <div class="field">
+      <label>Close on reversal</label>
+      <div class="hint">If a position is open and the signal flips to the opposite direction
+        (UP → DOWN or DOWN → UP), close it immediately (tagged as a reversal in history).
+        Neutral does not trigger this — only an opposite buy/sell signal.</div>
+      <div class="opts">
+        <label class="opt"><input type="checkbox" id="close_on_reversal"><span>Enabled</span></label>
+      </div>
+    </div>
+
+    <div class="field">
       <label>Signal delay (seconds)</label>
       <div class="hint">Wait this long after a candle closes before calling TA, so its feed has
         published the new candle (it lags ~15–40s).</div>
@@ -143,6 +153,7 @@ function buildOpts(cur){
   $("use_ma").checked=cur.use_ma;
   $("use_oscillator").checked=cur.use_oscillator;
   $("close_on_neutral").checked=cur.close_on_neutral;
+  $("close_on_reversal").checked=cur.close_on_reversal;
   $("signal_delay_sec").value=cur.signal_delay_sec;
 }
 
@@ -163,6 +174,7 @@ $("form").addEventListener("submit",async e=>{
     use_ma:$("use_ma").checked,
     use_oscillator:$("use_oscillator").checked,
     close_on_neutral:$("close_on_neutral").checked,
+    close_on_reversal:$("close_on_reversal").checked,
     signal_delay_sec:parseInt($("signal_delay_sec").value||"20",10),
   };
   const msg=$("msg"); $("save").disabled=true; msg.textContent="Saving…"; msg.className="msg";
