@@ -148,17 +148,19 @@ class Engine:
             self._settle(self.win)
 
     def _settle(self, w: dict):
+        # Only windows where a position was actually opened go to history.
+        pred = w.get("prediction")
+        if not pred:
+            w["settled"] = True
+            return
         o, c = w["open"], w["close"]
         result = "UP" if c > o else "DOWN" if c < o else "FLAT"
-        pred = w.get("prediction")
-        outcome = "none"
-        if pred:
-            if result == "FLAT":
-                outcome = "flat"; self.stats["flat"] += 1
-            elif pred == result:
-                outcome = "win"; self.stats["wins"] += 1; self.stats["trades"] += 1
-            else:
-                outcome = "loss"; self.stats["losses"] += 1; self.stats["trades"] += 1
+        if result == "FLAT":
+            outcome = "flat"; self.stats["flat"] += 1
+        elif pred == result:
+            outcome = "win"; self.stats["wins"] += 1; self.stats["trades"] += 1
+        else:
+            outcome = "loss"; self.stats["losses"] += 1; self.stats["trades"] += 1
         self.history.append({
             "openTime": w["openTime"], "open": o, "close": c, "result": result,
             "prediction": pred, "outcome": outcome,
