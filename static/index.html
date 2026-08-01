@@ -88,6 +88,7 @@
   tr:last-child td{border-bottom:none;}
   .res{font-weight:800;font-size:11px;padding:2px 7px;border-radius:5px;color:#fff;}
   .res.UP{background:var(--up);} .res.DOWN{background:var(--down);} .res.FLAT{background:var(--neutral);}
+  .res.reversal{background:#a855f7;}
   .oc{font-weight:800;font-size:11px;}
   .oc.win{color:var(--up);} .oc.loss{color:var(--down);} .oc.none,.oc.pre,.oc.flat{color:var(--muted);}
   .oc.neutral{color:var(--accent);}
@@ -264,12 +265,7 @@ function render(st){
     $("barfill").style.width=Math.max(0,Math.min(100,(now-w.openTime)/tot*100))+"%";
     // position
     const p=w.prediction;
-    if(w.earlyClosed){
-      const reason=w.closeReason==="reversal"?"signal reversed to the opposite direction":"signal turned neutral";
-      $("posPill").className="pill WAIT"; $("posPill").textContent="CLOSED";
-      $("posTitle").textContent=`${p} position closed — ${reason}`;
-      $("posMeta").textContent=`exited early @ ${fmt(w.price)} · no win/loss counted`;
-    }else if(p){
+    if(p){
       $("posPill").className="pill "+p; $("posPill").textContent=p;
       $("posTitle").textContent=`${p} position — predicting candle closes ${p==="UP"?"above":"below"} open`;
       $("posMeta").textContent=`entered @ ${fmt(w.entryPrice)}${w.entryTime?" · "+timeStr(w.entryTime):""}`;
@@ -309,10 +305,11 @@ function render(st){
   const hb=$("hist"); hb.innerHTML="";
   (st.history||[]).forEach(h=>{
     const tr=document.createElement("tr");
-    tr.innerHTML=`<td class="num">${timeStr(h.openTime)}</td>
+    const resTxt = h.result==="reversal" ? "REVERSAL" : h.result;
+    tr.innerHTML=`<td class="num">${timeStr(h.time!=null?h.time:h.openTime)}</td>
       <td class="r num">${fmt(h.open)}</td>
       <td class="r num">${fmt(h.close)}</td>
-      <td><span class="res ${h.result}">${h.result}</span></td>
+      <td><span class="res ${h.result}">${resTxt}</span></td>
       <td>${h.prediction?`<span class="tag ${h.prediction}">${h.prediction}</span>`:'<span class="neu-c">—</span>'}</td>
       <td><span class="oc ${h.outcome}">${h.outcome==="none"?"no bet":h.outcome==="pre"?"pre-start":h.outcome==="neutral"?"NEUTRAL CLOSE":h.outcome==="reversal"?"REVERSAL":h.outcome.toUpperCase()}</span></td>`;
     hb.appendChild(tr);

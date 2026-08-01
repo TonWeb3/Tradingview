@@ -120,11 +120,13 @@ def history_csv():
     eng = app.state.engine
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["time_utc", "open_time_ms", "open", "close", "result", "prediction", "outcome"])
+    w.writerow(["entry_time_utc", "entry_time_ms", "window_open", "entry", "close",
+                "result", "prediction", "outcome"])
     for h in eng.history:
-        ts = datetime.fromtimestamp(h["openTime"] / 1000, timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-        w.writerow([ts, h["openTime"], h["open"], h["close"], h["result"],
-                    h.get("prediction") or "", h["outcome"]])
+        t = h.get("time") or h["openTime"]
+        ts = datetime.fromtimestamp(t / 1000, timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        w.writerow([ts, t, h["open"], h.get("entry") or "", h["close"],
+                    h["result"], h.get("prediction") or "", h["outcome"]])
     return Response(
         content=buf.getvalue(), media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=binary_op_history.csv"},

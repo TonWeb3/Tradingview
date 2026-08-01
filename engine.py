@@ -161,10 +161,7 @@ class Engine:
             outcome = "win"; self.stats["wins"] += 1; self.stats["trades"] += 1
         else:
             outcome = "loss"; self.stats["losses"] += 1; self.stats["trades"] += 1
-        self.history.append({
-            "openTime": w["openTime"], "open": o, "close": c, "result": result,
-            "prediction": pred, "outcome": outcome,
-        })
+        self._record(w, c, result, outcome)
         w["settled"] = True
         log.info("window settled: open=%s close=%s result=%s pred=%s -> %s",
                  o, c, result, pred, outcome)
@@ -197,65 +194,62 @@ class Engine:
         self.signal_time = now_ms()
 
     def _on_signal(self):
-        """React to a freshly computed signal: while in a position, maybe close
-        it (reversal or neutral); otherwise consider entering."""
+        """While in a position: on a signal reversal, close it (as 'reversal')
+        and immediately open a new position in the reversed direction; on neutral,
+        close it and wait (re-entry allowed). Otherwise consider entering."""
         w, s = self.win, self.signal
         if not w or w.get("settled"):
             return
         pred = w.get("prediction")
         if pred:
             direction = s["signal"]
-            # Reversal: the signal flipped to the opposite direction. Neutral
-            # does NOT count here — only an actual opposite buy/sell signal.
             if (self.cfg.close_on_reversal and s.get("ready")
                     and direction in (sig.UP, sig.DOWN) and direction != pred):
-                self._close_position(w, "reversal")
+                price = self.live_price or w["close"]
+                self.stats["reversal"] += 1
+                self._record(w, price, "reversal", "reversal")
+                self._open_position(w, direction)   # re-enter in the reversed direction
                 return
-            # Neutral: agreement broke back to neutral/mixed.
             if self.cfg.close_on_neutral and s.get("ready") and direction == sig.WAIT:
-                self._close_position(w, "neutral")
+                price = self.live_price or w["close"]
+                o = w["open"]
+                rdir = "UP" if price > o else "DOWN" if price < o else "FLAT"
+                self.stats["neutral"] += 1
+                self._record(w, price, rdir, "neutral")
+                self._clear_position(w)
                 return
-            return                                  # same direction (or toggles off) -> hold
+            return                                  # same direction -> hold
         self._try_enter()
 
     def _try_enter(self):
-        """Enter the current window once, and only with a *fresh* signal.
-
-        The signal must have been refreshed after this window opened; otherwise
-        we'd be entering on a stale reading carried over from a previous candle.
-        Because every refresh waits signal_delay, this also means the window has
-        waited out the delay before any entry.
-        """
+        """Open a position, only with a *fresh* signal (refreshed after this
+        window opened) so we never enter on a stale carried-over reading."""
         w, s = self.win, self.signal
         if not w or w.get("settled") or w.get("prediction"):
             return
         if self.signal_time < w["openTime"]:
             return                                  # signal predates this window — too old
         if s["signal"] in (sig.UP, sig.DOWN):
-            w["prediction"] = s["signal"]
-            w["entryPrice"] = self.live_price
-            w["entryTime"] = now_ms()
-            w["entryCells"] = s["cells"]
-            log.info("ENTER %s @ %s (window open %s, signal age %.0fs)",
-                     s["signal"], self.live_price, w["open"], (now_ms() - self.signal_time) / 1000)
+            self._open_position(w, s["signal"])
 
-    def _close_position(self, w: dict, reason: str):
-        """Close an open position mid-window. `reason` is 'neutral' (signal went
-        neutral) or 'reversal' (signal flipped to the opposite direction).
-        Either way it's an early exit — not counted as a win or a loss."""
-        price = self.live_price or w["close"]
-        o = w["open"]
-        result = "UP" if price > o else "DOWN" if price < o else "FLAT"
-        self.stats[reason] += 1
+    def _open_position(self, w: dict, direction: str):
+        w["prediction"] = direction
+        w["entryPrice"] = self.live_price
+        w["entryTime"] = now_ms()
+        w["entryCells"] = self.signal["cells"]
+        log.info("ENTER %s @ %s (window open %s)", direction, self.live_price, w["open"])
+
+    def _clear_position(self, w: dict):
+        w["prediction"] = w["entryPrice"] = w["entryTime"] = w["entryCells"] = None
+
+    def _record(self, w: dict, close_price, result, outcome):
+        """Append a settled/closed position to history, timestamped at the exact
+        moment the position was opened (not the window open)."""
         self.history.append({
-            "openTime": w["openTime"], "open": o, "close": price, "result": result,
-            "prediction": w["prediction"], "outcome": reason,
+            "time": w.get("entryTime"), "openTime": w["openTime"], "open": w["open"],
+            "entry": w.get("entryPrice"), "close": close_price,
+            "result": result, "prediction": w.get("prediction"), "outcome": outcome,
         })
-        w["settled"] = True          # done trading this window; no re-entry, no double settle
-        w["earlyClosed"] = True
-        w["closeReason"] = reason
-        log.info("%s CLOSE: pred=%s exit=%s (window open %s)",
-                 reason.upper(), w["prediction"], price, o)
 
     # ---- snapshot for the UI ------------------------------------------
     def snapshot(self) -> dict:
@@ -272,8 +266,6 @@ class Engine:
                 "liveResult": "UP" if price > o else "DOWN" if price < o else "FLAT",
                 "prediction": w.get("prediction"),
                 "entryPrice": w.get("entryPrice"), "entryTime": w.get("entryTime"),
-                "earlyClosed": bool(w.get("earlyClosed")),
-                "closeReason": w.get("closeReason"),
                 # True once a fresh (post-open, delay-gated) signal exists for this window.
                 "signalFresh": self.signal_time >= w["openTime"],
             }
